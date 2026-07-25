@@ -18,9 +18,34 @@ headless, not just exit codes):
 | 5 | 6-dim continuous action (index→joint verified) | ✅ | `so101_cfg.py` (`ActionCfg`) |
 | 6 | Wrist camera mounted on gripper | ✅ | `so101_cfg.py` (`SceneCfg`) |
 | 8 | Rubric retargeted (gripper-agnostic) | ✅ | `rubrics/checkers.py`, `rubrics/so101_rubrics.py` |
-| 7 | SO101 InferenceClient | ⏳ blocked | needs a trained policy's I/O contract |
+| 7 | SO101 InferenceClient | ✅ | `src/polaris/policy/so101_client.py` |
+| 10 | end-to-end eval (OSS ACT policy) | ✅ | `SO101-FoodBussing` env, plumbing test |
 | 9 | real2sim scene (splat + objects) | ⏳ blocked | needs captured scene (external `real2simeval` pipeline) |
-| 10 | end-to-end eval | 🔒 | blocked on 7 + 9 |
+
+**Runs end-to-end** with an off-the-shelf LeRobot ACT checkpoint
+(`mot-prog/so101_pick_up_wrist_pan_act`) served from a dedicated `lerobot` conda
+env (`serve_lerobot_act.py`) into the `SO101-FoodBussing` env (SO-101 dropped in
+the reused splat scene). This is a *plumbing* validation only — the arm is
+outside the Franka-framed camera and the policy is out-of-distribution, so
+`progress = 0.0`. A meaningful eval needs a real2sim scene built for the SO-101
+(#9) + a policy trained for it.
+
+### Generic embodiment framework
+
+The SO-101 work above is generalized so a new robot is *"convert URDF → fill a
+spec → point at a checkpoint → validate"* (`src/polaris/embodiment/`):
+
+| module | what |
+|--------|------|
+| `spec.py` | declarative `EmbodimentSpec` (+ `specs/so101.yaml`) |
+| `urdf_ingest.py` | any URDF → spec (verified: SO-101, Franka) |
+| `policy_adapter.py` | any LeRobot checkpoint → I/O contract (verified: ACT, SmolVLA) |
+| `builders.py` | spec → IsaacLab cfgs (app-gated) |
+| `tasks.py` / `validate.py` | spec-driven rubric / `validate_embodiment(spec)` |
+| `policy/lerobot_client.py` + `serve_lerobot.py` | generic client+server for any LeRobot policy |
+
+GPU-free smoke tests: `test_embodiment_cpu.py`, `test_serve_lerobot_cpu.py` (pass).
+Deferred (GPU): `test_spec_builders_gpu.py` (spec-built SO-101 == hand-written).
 
 ## Reproduce the robot asset
 
@@ -60,21 +85,36 @@ python so101_port/view_so101_live.py          # GUI viewer (headless=False), wat
 - The base is a **fixed root** (`fix_base=True` at conversion, `fix_root_link`),
   i.e. table-mounted.
 
-## Remaining work (needs the user)
+## Running the SO-101 eval (OSS harness)
 
-- **#7 InferenceClient** — needs the trained policy's exact I/O (image res /
-  normalization, state format/units, action space/units, control freq/chunking).
-- **#9 scene** — needs the captured table: splat reconstruction + object meshes +
-  ChArUco-calibrated poses **in the SO-101 base frame** + `scene.usda` +
-  `initial_conditions.json`.
-- **#10** — run `eval.py` with a Fake policy first, then the real client.
+1. Create the `lerobot` env once (lerobot ≥ 0.4 needs Python ≥ 3.12; the
+   openpi-pinned 0.1.0 can't load modern "processor" checkpoints):
+   ```bash
+   conda create -y -n lerobot python=3.12
+   conda run -n lerobot pip install "lerobot==0.6.0" websockets msgpack msgpack-numpy
+   conda run -n lerobot pip install -e third_party/openpi/packages/openpi-client
+   ```
+2. Serve the policy (dedicated env) and eval (polaris env), in two shells:
+   ```bash
+   conda run -n lerobot python so101_port/serve_lerobot.py \
+       --repo mot-prog/so101_pick_up_wrist_pan_act --port 8000 \
+       --state-units degrees --action-units degrees
+   # then, in the polaris conda env with polaris_env_conda.sh sourced:
+   python scripts/eval.py --environment SO101-FoodBussing \
+       --policy.client LeRobot --policy.port 8000 --run-folder runs/so101
+   ```
+   (`so101_client.py` + `serve_lerobot_act.py` are the hand-written equivalents,
+   kept for reference; the generic `LeRobot` client + `serve_lerobot.py` above
+   supersede them.)
 
-### OSS policy for a harness test (parked)
+## Remaining work
 
-To dry-run #7/#10 before the user trains their own, a good off-the-shelf policy
-is `mot-prog/so101_pick_up_wrist_pan_act` on HF Hub (ACT; `observation.state`[6],
-`action`[6]; cameras `wrist` + `shoulder_pan`). **Blocker:** it uses LeRobot's
-new "processor" checkpoint format needing **lerobot ≥ 0.4**, but the only
-installed lerobot is **0.1.0** (openpi-pinned). Cleanest path = run the ACT
-policy in a small dedicated lerobot env as a websocket server (mirrors the π0.5
-setup); the `SO101Client` connects to it. Decision deferred.
+- **#9 real2sim scene** *(needs the user)* — the captured table: splat
+  reconstruction + object meshes + ChArUco-calibrated poses **in the SO-101 base
+  frame** + `scene.usda` + `initial_conditions.json` (external `real2simeval`
+  pipeline). Required for a *meaningful* eval, plus a policy trained for it and
+  the wrist-cam extrinsics set to the real mount.
+- **Deferred (GPU)** — `test_spec_builders_gpu.py` (spec-built == hand-written);
+  generic `build_env_cfg`/registration; a **camera reposition** so the SO-101 is
+  actually in frame (the FoodBussing external cam is aimed at the Franka's ~0.5 m
+  workspace, beyond the SO-101's ~0.35 m reach).

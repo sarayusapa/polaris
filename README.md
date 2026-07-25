@@ -156,17 +156,62 @@ Time Estimate: 20 Minutes Human Time + 40 Minutes Offline Training
 
 For detailed instructions, see [docs/custom_environments.md](docs/custom_environments.md)
 
-## SO-101 embodiment port (WIP)
-An in-progress port of the eval harness from the DROID/Franka platform to the
-[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm (5 arm + 1 gripper).
-The robot side is done and validated in Isaac Sim: URDF→USD conversion, a 6-DOF
-`SO101` articulation (`src/polaris/environments/so101_robot_cfg.py`), a 6-dim
-continuous joint-position action + gripper-mounted camera
-(`src/polaris/environments/so101_cfg.py`), and a gripper-agnostic pick-place
-rubric (`src/polaris/environments/rubrics/so101_rubrics.py`). Still needed: a
-policy client for a trained SO-101 policy and a real2sim scene. See
-[so101_port/README.md](so101_port/README.md) for the full status, repro steps,
-and design notes.
+## Beyond DROID: custom robots & policies (WIP)
+
+PolaRiS ships DROID/Franka-locked. This fork adds (a) a concrete port to the
+[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm, and (b) a generic,
+spec-driven framework so *any* URDF + *any* LeRobot policy can be evaluated
+without hand-writing per-robot modules. Full status, repro steps, and design
+notes: [so101_port/README.md](so101_port/README.md).
+
+### 1. SO-101 port (the worked example)
+
+The SO-101 (5 arm + 1 gripper) is ported and validated end-to-end in Isaac Sim:
+
+- **URDF → USD** conversion (`so101_port/convert_so101_urdf.py`, Isaac Lab
+  `UrdfConverter`).
+- **Robot** — a 6-DOF `SO101` articulation with Feetech-tuned actuators
+  (`src/polaris/environments/so101_robot_cfg.py`).
+- **Env** — a **6-dim continuous joint-position** action (LeRobot motor order,
+  not DROID's 7 + binary gripper) and a gripper-mounted wrist camera
+  (`src/polaris/environments/so101_cfg.py`).
+- **Rubric** — `is_within_xy` made gripper-agnostic (the SO-101 gripper opens at
+  *large* angles, inverse of DROID) + a pick-place builder
+  (`src/polaris/environments/rubrics/so101_rubrics.py`).
+- **Policy** — an off-the-shelf LeRobot **ACT** checkpoint served over the
+  openpi websocket protocol (`src/polaris/policy/so101_client.py` +
+  `so101_port/serve_lerobot_act.py`, run in a dedicated `lerobot` conda env;
+  the ACT policy is in degrees, the sim in radians, so the server converts).
+- **Runs end-to-end** via the `SO101-FoodBussing` env (the SO-101 dropped into
+  the existing splat scene). This is a *plumbing* validation — the arm is out of
+  the Franka-framed camera and the policy is out-of-distribution, so it does not
+  complete the task. A meaningful eval still needs a real2sim scene built for
+  the SO-101 and a policy trained for it.
+
+### 2. Generic embodiment framework
+
+The SO-101 work is generalized so a new robot is *"convert URDF → fill a ~90-line
+spec → point at a checkpoint → validate"*, not three hand-written modules
+(`src/polaris/embodiment/`):
+
+- **`EmbodimentSpec`** (`spec.py`) — one declarative spec per robot (joints,
+  gripper semantics, action units, cameras, ee frame). `specs/so101.yaml` is the
+  SO-101 as a spec.
+- **URDF → spec** (`urdf_ingest.py`) — parses any URDF into a spec template
+  (joints in base→tip motor order, limits, ee/gripper guesses). Verified on
+  SO-101 and Franka.
+- **Policy adapter** (`policy_adapter.py`) — reads any LeRobot checkpoint's
+  `config.json` and auto-derives its I/O contract (state/action dims, camera
+  keys, chunk). Verified on ACT and SmolVLA.
+- **Generic client + server** — `src/polaris/policy/lerobot_client.py` (client
+  `"LeRobot"`, self-configures from server metadata) + `so101_port/serve_lerobot.py`
+  (type dispatch, auto I/O, deg/rad units). One adapter serves any LeRobot policy.
+- **Builders + validation** — `builders.py` (spec → IsaacLab cfgs),
+  `tasks.py` (spec-driven rubrics), `validate.py` (`validate_embodiment(spec)`).
+
+GPU-free pieces are smoke-tested in `so101_port/test_embodiment_cpu.py` and
+`test_serve_lerobot_cpu.py`. The spec↔hand-written equivalence run
+(`test_spec_builders_gpu.py`) is the one deferred, GPU-gated check.
 
 ## Issues
 This codebase has been tested on CUDA 13 and CUDA 12 with NVIDIA 5090 and 3090 GPUs. Please raise an issue if you run into any issues.
