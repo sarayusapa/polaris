@@ -3,6 +3,7 @@ from polaris.environments.manager_based_rl_splat_environment import (
     ManagerBasedRLSplatEnv,
 )
 from polaris.environments.droid_cfg import EnvCfg as DroidCfg
+from polaris.environments.so101_cfg import EnvCfg as SO101Cfg
 from isaaclab.envs import ManagerBasedRLEnv
 
 # Import rubric system
@@ -130,6 +131,46 @@ gym.register(
                 checkers.reach("tape_00", threshold=0.2),
                 (checkers.lift("tape_00", threshold=0.04), [0]),
                 (checkers.is_within_xy("tape_00", "container_02", percent_threshold=0.8), [1]),
+            ]
+        ),
+    },
+)
+
+
+# =============================================================================
+# SO-101 embodiment port — reuse the FoodBussing splat scene with the SO-101
+# arm instead of the Franka (harness test; see so101_port/README.md).
+# =============================================================================
+gym.register(
+    id="SO101-FoodBussing",
+    entry_point=ManagerBasedRLSplatEnv,
+    disable_env_checker=True,
+    order_enforce=False,
+    kwargs={
+        "env_cfg_entry_point": SO101Cfg,
+        "usd_file": str(DATA_PATH / "food_bussing/scene.usda"),
+        "rubric": Rubric(
+            criteria=[
+                checkers.reach("ice_cream_", threshold=0.2),
+                checkers.reach("grapes", threshold=0.2),
+                (checkers.lift("ice_cream_", threshold=0.06), [0]),
+                (checkers.lift("grapes", threshold=0.06), [1]),
+                (
+                    checkers.is_within_xy(
+                        "ice_cream_", "bowl", percent_threshold=0.8,
+                        gripper_joint="gripper", open_is_large=True,
+                        open_finger_threshold=0.9,
+                    ),
+                    [2],
+                ),
+                (
+                    checkers.is_within_xy(
+                        "grapes", "bowl", percent_threshold=0.8,
+                        gripper_joint="gripper", open_is_large=True,
+                        open_finger_threshold=0.9,
+                    ),
+                    [3],
+                ),
             ]
         ),
     },

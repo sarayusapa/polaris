@@ -1,0 +1,111 @@
+name: so101
+usd_path: PolaRiS-Hub/so101/so101.usd
+urdf_path: so101_port/urdf/so101.urdf
+fixed_base: true
+joints:
+- name: shoulder_pan
+  lower: -1.91986
+  upper: 1.91986
+  home: 0.0
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+- name: shoulder_lift
+  lower: -1.74533
+  upper: 1.74533
+  home: 0.0
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+- name: elbow_flex
+  lower: -1.69
+  upper: 1.69
+  home: 0.0
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+- name: wrist_flex
+  lower: -1.65806
+  upper: 1.65806
+  home: 0.0
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+- name: wrist_roll
+  lower: -2.74385
+  upper: 2.84121
+  home: 0.0
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+- name: gripper
+  lower: -0.174533
+  upper: 1.74533
+  home: 1.5
+  kp: 17.8
+  kd: 0.6
+  effort: 10.0
+  velocity: 10.0
+gripper:
+  joint: gripper
+  open_is_large: true
+  open_value: 1.5
+  closed_value: -0.1
+  open_threshold: 0.9
+action:
+  type: joint_position
+  units: radians
+  order:
+  - shoulder_pan
+  - shoulder_lift
+  - elbow_flex
+  - wrist_flex
+  - wrist_roll
+  - gripper
+state_units: radians
+cameras:
+  wrist:
+    parent_link: gripper_frame_link
+    offset_pos:
+    - 0.0
+    - 0.0
+    - 0.0
+    offset_rot:
+    - 0.5
+    - -0.5
+    - 0.5
+    - -0.5
+    width: 1280
+    height: 720
+    focal_length: 2.8
+    horizontal_aperture: 5.376
+    vertical_aperture: 3.024
+    from_scene: false
+  external:
+    parent_link: null
+    offset_pos:
+    - 0.0
+    - 0.0
+    - 0.0
+    offset_rot:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    width: 1280
+    height: 720
+    focal_length: 2.8
+    horizontal_aperture: 5.376
+    vertical_aperture: 3.024
+    from_scene: true
+ee_frame:
+  link: gripper_frame_link
+  offset:
+  - 0.0
+  - 0.0
+  - 0.0
