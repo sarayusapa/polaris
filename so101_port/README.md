@@ -11,16 +11,16 @@ headless, not just exit codes):
 
 | # | step | status | artifact |
 |---|------|--------|----------|
-| 1 | Locate SO-101 URDF + meshes | ✅ | `urdf/` (fetched, gitignored) |
-| 2 | URDF → USD | ✅ | `convert_so101_urdf.py` → `PolaRiS-Hub/so101/so101.usd` |
-| 3 | Spawn + validate (6 DOF, no crash) | ✅ | `validate_so101_usd.py` |
-| 4 | `so101_robot_cfg.py` (actuators, home pose) | ✅ | `src/polaris/environments/so101_robot_cfg.py` |
-| 5 | 6-dim continuous action (index→joint verified) | ✅ | `so101_cfg.py` (`ActionCfg`) |
-| 6 | Wrist camera mounted on gripper | ✅ | `so101_cfg.py` (`SceneCfg`) |
-| 8 | Rubric retargeted (gripper-agnostic) | ✅ | `rubrics/checkers.py`, `rubrics/so101_rubrics.py` |
-| 7 | SO101 InferenceClient | ✅ | `src/polaris/policy/so101_client.py` |
-| 10 | end-to-end eval (OSS ACT policy) | ✅ | `SO101-FoodBussing` env, plumbing test |
-| 9 | real2sim scene (splat + objects) | ⏳ blocked | needs captured scene (external `real2simeval` pipeline) |
+| 1 | Locate SO-101 URDF + meshes | done | `urdf/` (fetched, gitignored) |
+| 2 | URDF → USD | done | `convert_so101_urdf.py` → `PolaRiS-Hub/so101/so101.usd` |
+| 3 | Spawn + validate (6 DOF, no crash) | done | `validate_so101_usd.py` |
+| 4 | `so101_robot_cfg.py` (actuators, home pose) | done | `src/polaris/environments/so101_robot_cfg.py` |
+| 5 | 6-dim continuous action (index→joint verified) | done | `so101_cfg.py` (`ActionCfg`) |
+| 6 | Wrist camera mounted on gripper | done | `so101_cfg.py` (`SceneCfg`) |
+| 8 | Rubric retargeted (gripper-agnostic) | done | `rubrics/checkers.py`, `rubrics/so101_rubrics.py` |
+| 7 | SO101 InferenceClient | done | `src/polaris/policy/so101_client.py` |
+| 10 | end-to-end eval (OSS ACT policy) | done | `SO101-FoodBussing` env, plumbing test |
+| 9 | real2sim scene (splat + objects) | blocked | needs captured scene (external `real2simeval` pipeline) |
 
 **Runs end-to-end** with an off-the-shelf LeRobot ACT checkpoint
 (`mot-prog/so101_pick_up_wrist_pan_act`) served from a dedicated `lerobot` conda

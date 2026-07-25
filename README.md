@@ -156,62 +156,60 @@ Time Estimate: 20 Minutes Human Time + 40 Minutes Offline Training
 
 For detailed instructions, see [docs/custom_environments.md](docs/custom_environments.md)
 
-## Beyond DROID: custom robots & policies (WIP)
+## Custom robots & policies (WIP)
 
-PolaRiS ships DROID/Franka-locked. This fork adds (a) a concrete port to the
-[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm, and (b) a generic,
-spec-driven framework so *any* URDF + *any* LeRobot policy can be evaluated
-without hand-writing per-robot modules. Full status, repro steps, and design
-notes: [so101_port/README.md](so101_port/README.md).
+PolaRiS ships DROID/Franka-locked. This fork adds a port to the
+[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm, and a spec-driven
+framework so any URDF and any LeRobot policy can be evaluated without
+hand-writing per-robot modules. Details, repro steps, and design notes are in
+[so101_port/README.md](so101_port/README.md).
 
-### 1. SO-101 port (the worked example)
+### SO-101 port
 
-The SO-101 (5 arm + 1 gripper) is ported and validated end-to-end in Isaac Sim:
+The SO-101 (5 arm + 1 gripper) is ported and validated in Isaac Sim:
 
-- **URDF → USD** conversion (`so101_port/convert_so101_urdf.py`, Isaac Lab
-  `UrdfConverter`).
-- **Robot** — a 6-DOF `SO101` articulation with Feetech-tuned actuators
+- URDF to USD via Isaac Lab's `UrdfConverter` (`so101_port/convert_so101_urdf.py`).
+- A 6-DOF `SO101` articulation with Feetech-tuned actuators
   (`src/polaris/environments/so101_robot_cfg.py`).
-- **Env** — a **6-dim continuous joint-position** action (LeRobot motor order,
-  not DROID's 7 + binary gripper) and a gripper-mounted wrist camera
+- A 6-dim continuous joint-position action in LeRobot motor order (not DROID's 7
+  joints + binary gripper) and a gripper-mounted wrist camera
   (`src/polaris/environments/so101_cfg.py`).
-- **Rubric** — `is_within_xy` made gripper-agnostic (the SO-101 gripper opens at
-  *large* angles, inverse of DROID) + a pick-place builder
+- `is_within_xy` made gripper-agnostic, since the SO-101 gripper opens at large
+  angles (inverse of DROID), plus a pick-place builder
   (`src/polaris/environments/rubrics/so101_rubrics.py`).
-- **Policy** — an off-the-shelf LeRobot **ACT** checkpoint served over the
-  openpi websocket protocol (`src/polaris/policy/so101_client.py` +
-  `so101_port/serve_lerobot_act.py`, run in a dedicated `lerobot` conda env;
-  the ACT policy is in degrees, the sim in radians, so the server converts).
-- **Runs end-to-end** via the `SO101-FoodBussing` env (the SO-101 dropped into
-  the existing splat scene). This is a *plumbing* validation — the arm is out of
-  the Franka-framed camera and the policy is out-of-distribution, so it does not
-  complete the task. A meaningful eval still needs a real2sim scene built for
-  the SO-101 and a policy trained for it.
+- An off-the-shelf LeRobot ACT checkpoint served over the openpi websocket
+  protocol (`src/polaris/policy/so101_client.py` +
+  `so101_port/serve_lerobot_act.py`, in a dedicated `lerobot` conda env; the
+  policy is in degrees and the sim in radians, so the server converts).
 
-### 2. Generic embodiment framework
+It runs end-to-end via the `SO101-FoodBussing` env (the SO-101 in the existing
+splat scene). This only exercises the pipeline: the arm is outside the
+Franka-framed camera and the policy is out-of-distribution, so it does not
+complete the task. A real eval needs a scene built for the SO-101 and a policy
+trained for it.
 
-The SO-101 work is generalized so a new robot is *"convert URDF → fill a ~90-line
-spec → point at a checkpoint → validate"*, not three hand-written modules
-(`src/polaris/embodiment/`):
+### Generic embodiment framework
 
-- **`EmbodimentSpec`** (`spec.py`) — one declarative spec per robot (joints,
-  gripper semantics, action units, cameras, ee frame). `specs/so101.yaml` is the
-  SO-101 as a spec.
-- **URDF → spec** (`urdf_ingest.py`) — parses any URDF into a spec template
-  (joints in base→tip motor order, limits, ee/gripper guesses). Verified on
-  SO-101 and Franka.
-- **Policy adapter** (`policy_adapter.py`) — reads any LeRobot checkpoint's
-  `config.json` and auto-derives its I/O contract (state/action dims, camera
-  keys, chunk). Verified on ACT and SmolVLA.
-- **Generic client + server** — `src/polaris/policy/lerobot_client.py` (client
-  `"LeRobot"`, self-configures from server metadata) + `so101_port/serve_lerobot.py`
-  (type dispatch, auto I/O, deg/rad units). One adapter serves any LeRobot policy.
-- **Builders + validation** — `builders.py` (spec → IsaacLab cfgs),
-  `tasks.py` (spec-driven rubrics), `validate.py` (`validate_embodiment(spec)`).
+`src/polaris/embodiment/` generalizes the SO-101 work so a new robot is convert
+URDF, fill a spec, point at a checkpoint, validate — instead of three
+hand-written modules:
 
-GPU-free pieces are smoke-tested in `so101_port/test_embodiment_cpu.py` and
-`test_serve_lerobot_cpu.py`. The spec↔hand-written equivalence run
-(`test_spec_builders_gpu.py`) is the one deferred, GPU-gated check.
+- `spec.py` — `EmbodimentSpec`, one declarative spec per robot (joints, gripper,
+  action units, cameras, ee frame). `specs/so101.yaml` is the SO-101 as a spec.
+- `urdf_ingest.py` — parses any URDF into a spec template (joints in base-to-tip
+  motor order, limits, ee/gripper guesses). Tested on SO-101 and Franka.
+- `policy_adapter.py` — reads a LeRobot checkpoint's `config.json` and derives
+  its I/O contract (state/action dims, camera keys, chunk). Tested on ACT and
+  SmolVLA.
+- `lerobot_client.py` (client `LeRobot`) + `so101_port/serve_lerobot.py` — a
+  generic client/server that self-configures from the checkpoint, so one adapter
+  serves any LeRobot policy.
+- `builders.py` (spec to IsaacLab cfgs), `tasks.py` (spec-driven rubrics),
+  `validate.py` (`validate_embodiment(spec)`).
+
+The GPU-free parts are covered by `so101_port/test_embodiment_cpu.py` and
+`test_serve_lerobot_cpu.py`. `test_spec_builders_gpu.py` (spec-built vs
+hand-written) is the one check that needs a GPU.
 
 ## Issues
 This codebase has been tested on CUDA 13 and CUDA 12 with NVIDIA 5090 and 3090 GPUs. Please raise an issue if you run into any issues.
