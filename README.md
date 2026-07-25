@@ -156,6 +156,18 @@ Time Estimate: 20 Minutes Human Time + 40 Minutes Offline Training
 
 For detailed instructions, see [docs/custom_environments.md](docs/custom_environments.md)
 
+## SO-101 embodiment port (WIP)
+An in-progress port of the eval harness from the DROID/Franka platform to the
+[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm (5 arm + 1 gripper).
+The robot side is done and validated in Isaac Sim: URDF→USD conversion, a 6-DOF
+`SO101` articulation (`src/polaris/environments/so101_robot_cfg.py`), a 6-dim
+continuous joint-position action + gripper-mounted camera
+(`src/polaris/environments/so101_cfg.py`), and a gripper-agnostic pick-place
+rubric (`src/polaris/environments/rubrics/so101_rubrics.py`). Still needed: a
+policy client for a trained SO-101 policy and a real2sim scene. See
+[so101_port/README.md](so101_port/README.md) for the full status, repro steps,
+and design notes.
+
 ## Issues
 This codebase has been tested on CUDA 13 and CUDA 12 with NVIDIA 5090 and 3090 GPUs. Please raise an issue if you run into any issues.
 

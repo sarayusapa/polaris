@@ -61,6 +61,7 @@ class InferenceClient(ABC):
         pass
 
 
+@InferenceClient.register(client_name="Fake")
 class FakeClient(InferenceClient):
     """
     Fake client that returns a dummy action and visualization.

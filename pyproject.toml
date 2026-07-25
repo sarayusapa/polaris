@@ -23,6 +23,11 @@ dependencies = [
 [project.scripts]
 polaris = "polaris.cli:main"
 
+[tool.uv.extra-build-dependencies]
+# flatdict==4.0.1 (via isaaclab) imports pkg_resources in setup.py. setuptools
+# >=81 removed pkg_resources, so pin the build's setuptools below that.
+flatdict = ["setuptools<81"]
+
 [tool.uv]
 override-dependencies = [
     "pywin32==306; sys_platform == 'win32'",

@@ -4,6 +4,21 @@ runs/
 PolaRiS-Hub/
 PolaRiS-datasets/
 
+# PolaRiS local runtime / machine-specific (regenerable, not for VCS)
+# bundled ffmpeg static binary (77M)
+.polaris_bin/
+# vendored third-party SO-101 URDF + STL meshes (fetched from SO-ARM100,
+# see so101_port/README.md) — not vendored into VCS
+so101_port/urdf/
+# The converted SO-101 USD lives under PolaRiS-Hub/so101/ (already ignored
+# above) — regenerate it with so101_port/convert_so101_urdf.py.
+# .polaris_shims/ is intentionally NOT ignored (small runtime shims).
+
+# Isaac Sim / Omniverse local caches
+*.usd.lock
+.thumbs/
+.asset_hash
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

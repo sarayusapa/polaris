@@ -32,18 +32,34 @@ def lift(obj_name, threshold=0.05, default_height=None):
     return checker
 
 
-def is_within_xy(object1, object2, percent_threshold=0.5, open_finger_threshold=0.1):
+def is_within_xy(
+    object1,
+    object2,
+    percent_threshold=0.5,
+    open_finger_threshold=0.1,
+    gripper_joint="finger_joint",
+    open_is_large=False,
+):
     """
     Check if object1 is inside object2.
+
+    The gripper must be open (object released) for placement to count. Gripper
+    conventions differ by robot:
+      * DROID/Robotiq ``finger_joint``: small = open  -> open_is_large=False
+        (default), open when joint < open_finger_threshold.
+      * SO-101 ``gripper`` servo: large = open        -> open_is_large=True,
+        open when joint >= open_finger_threshold.
     """
 
     def checker(env):
-        # ee should be open
+        # ee should be open (object released)
         stage = get_context().get_stage()
-        finger_joint = env.scene["robot"].data.joint_pos[0][
-            env.scene["robot"].data.joint_names.index("finger_joint")
-        ]
-        if finger_joint >= open_finger_threshold:
+        robot = env.scene["robot"]
+        gpos = robot.data.joint_pos[0][robot.data.joint_names.index(gripper_joint)]
+        is_open = (gpos >= open_finger_threshold) if open_is_large else (
+            gpos < open_finger_threshold
+        )
+        if not is_open:
             return False
 
         obj1_prim = stage.GetPrimAtPath(f"/World/envs/env_0/scene/{object1}")
