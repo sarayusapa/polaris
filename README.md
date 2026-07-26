@@ -9,6 +9,29 @@
 
 PolaRiS is a evaluation framework for generalist policies. It provides tooling for reconstructing environments, evaluating models, and running experiments with minimal setup.
 
+## This repository: custom embodiments on top of PolaRiS
+
+This repository builds directly on top of upstream PolaRiS. Stock PolaRiS is
+locked to the DROID/Franka arm; the work here adds support for other robots
+without changing the underlying evaluation framework, and it was built up
+incrementally:
+
+1. **Ported the [SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm into
+   PolaRiS, by hand, as a worked example** — URDF→USD conversion, a 6-DOF
+   articulation, a 6-dim action space, cameras, and a rubric — then ran it
+   end-to-end against an off-the-shelf LeRobot policy in an existing splat scene.
+2. **Generalized that port to any URDF.** Instead of repeating those scripts for
+   every new robot, the same steps are now driven by a single declarative
+   `EmbodimentSpec` plus generic builders and a policy adapter. Onboarding a new
+   arm becomes *convert URDF → fill a spec → point at a checkpoint → validate*,
+   rather than writing a stack of per-robot modules.
+
+Everything below (installation, running an eval, the DROID environments) is
+unchanged upstream PolaRiS. The added code lives under
+[`src/polaris/embodiment/`](src/polaris/embodiment/) and
+[`so101_port/`](so101_port/); see [Custom robots & policies](#custom-robots--policies)
+and [so101_port/README.md](so101_port/README.md) for the details.
+
 ## Installation
 
 ### Clone the repository (recursively)
@@ -156,15 +179,13 @@ Time Estimate: 20 Minutes Human Time + 40 Minutes Offline Training
 
 For detailed instructions, see [docs/custom_environments.md](docs/custom_environments.md)
 
-## Custom robots & policies (WIP)
+## Custom robots & policies
 
-PolaRiS ships DROID/Franka-locked. This fork adds a port to the
-[SO-101](https://github.com/TheRobotStudio/SO-ARM100) arm, and a spec-driven
-framework so any URDF and any LeRobot policy can be evaluated without
-hand-writing per-robot modules. Details, repro steps, and design notes are in
-[so101_port/README.md](so101_port/README.md).
+This section details the two-step extension introduced above: the by-hand SO-101
+port, then the spec-driven framework that generalizes it to any URDF. Repro
+steps and design notes are in [so101_port/README.md](so101_port/README.md).
 
-### SO-101 port
+### Step 1 — SO-101 port (the worked example)
 
 The SO-101 (5 arm + 1 gripper) is ported and validated in Isaac Sim:
 
@@ -188,7 +209,7 @@ Franka-framed camera and the policy is out-of-distribution, so it does not
 complete the task. A real eval needs a scene built for the SO-101 and a policy
 trained for it.
 
-### Generic embodiment framework
+### Step 2 — Generic embodiment framework
 
 `src/polaris/embodiment/` generalizes the SO-101 work so a new robot is convert
 URDF, fill a spec, point at a checkpoint, validate — instead of three
