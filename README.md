@@ -30,7 +30,7 @@ Everything below (installation, running an eval, the DROID environments) is
 unchanged upstream PolaRiS. The added code lives under
 [`src/polaris/embodiment/`](src/polaris/embodiment/) and
 [`so101_port/`](so101_port/); see [Custom robots & policies](#custom-robots--policies)
-and [so101_port/README.md](so101_port/README.md) for the details.
+for the details.
 
 ## Installation
 
@@ -182,8 +182,8 @@ For detailed instructions, see [docs/custom_environments.md](docs/custom_environ
 ## Custom robots & policies
 
 This section details the two-step extension introduced above: the by-hand SO-101
-port, then the spec-driven framework that generalizes it to any URDF. Repro
-steps and design notes are in [so101_port/README.md](so101_port/README.md).
+port, then the spec-driven framework that generalizes it to any URDF. The added
+code lives in `src/polaris/embodiment/`, `src/polaris/policy/`, and `so101_port/`.
 
 ### Step 1 — SO-101 port (the worked example)
 
@@ -230,7 +230,65 @@ hand-written modules:
 
 The GPU-free parts are covered by `so101_port/test_embodiment_cpu.py` and
 `test_serve_lerobot_cpu.py`. `test_spec_builders_gpu.py` (spec-built vs
-hand-written) is the one check that needs a GPU.
+hand-written) is the GPU check.
+
+### Running it
+
+The SO-101 URDF + STL meshes are not vendored (third-party, gitignored). Fetch
+and convert the robot asset:
+
+```bash
+bash so101_port/fetch_urdf.sh                 # -> so101_port/urdf/ (from TheRobotStudio/SO-ARM100)
+# in the polaris conda env, with polaris_env_conda.sh sourced:
+python so101_port/convert_so101_urdf.py       # -> PolaRiS-Hub/so101/so101.usd
+```
+
+Modern LeRobot checkpoints need lerobot >= 0.4 (Python >= 3.12), which conflicts
+with the openpi-pinned lerobot 0.1.0, so the policy runs in its own env:
+
+```bash
+conda create -y -n lerobot python=3.12
+conda run -n lerobot pip install "lerobot==0.6.0" websockets msgpack msgpack-numpy
+conda run -n lerobot pip install -e third_party/openpi/packages/openpi-client
+```
+
+Then serve any LeRobot policy and run the eval in two shells:
+
+```bash
+conda run -n lerobot python so101_port/serve_lerobot.py \
+    --repo mot-prog/so101_pick_up_wrist_pan_act --port 8000 \
+    --state-units degrees --action-units degrees
+# in the polaris conda env with polaris_env_conda.sh sourced:
+python scripts/eval.py --environment Embodiment-FoodBussing \
+    --policy.client LeRobot --policy.port 8000 --run-folder runs/so101
+```
+
+`Embodiment-FoodBussing` builds its env from `specs/so101.yaml` through the
+generic path; `SO101-FoodBussing` is the equivalent hand-written env, and
+`so101_client.py` + `serve_lerobot_act.py` are the hand-written client/server —
+all kept as the worked example, superseded by the generic versions above.
+
+### Design notes
+
+- Action space is a 6-dim continuous joint position in LeRobot motor order
+  `[shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper]`
+  (absolute radians), not DROID's 7 joints + binary gripper.
+- The SO-101 gripper is open at large joint values and closed at small ones —
+  inverse of DROID — so `is_within_xy` takes `gripper_joint`/`open_is_large`.
+- The wrist camera is mounted on `gripper_frame_link`; its offset is a
+  placeholder to be set to the real mounted camera before a meaningful eval.
+- A URDF-converted USD carries no splat, and the splat env composites by semantic
+  id, so the robot is tagged `("class", "raytraced")` or it is dropped from every
+  camera view.
+- The base is a fixed root (table-mounted).
+
+### Remaining work
+
+A meaningful (not plumbing) eval needs the real2sim scene for the SO-101: a splat
+reconstruction + object meshes + poses calibrated to the SO-101 base frame
+(`scene.usda` + `initial_conditions.json`), objects within the arm's reach, the
+wrist/third-person cameras calibrated to the real rig, and a policy trained for
+that scene.
 
 ## Issues
 This codebase has been tested on CUDA 13 and CUDA 12 with NVIDIA 5090 and 3090 GPUs. Please raise an issue if you run into any issues.

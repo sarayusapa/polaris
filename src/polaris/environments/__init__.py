@@ -139,7 +139,7 @@ gym.register(
 
 # =============================================================================
 # SO-101 embodiment port — reuse the FoodBussing splat scene with the SO-101
-# arm instead of the Franka (harness test; see so101_port/README.md).
+# arm instead of the Franka (harness test; see the README "Custom robots" section).
 # =============================================================================
 gym.register(
     id="SO101-FoodBussing",
