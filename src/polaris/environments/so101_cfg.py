@@ -53,6 +53,35 @@ from polaris.environments.so101_robot_cfg import (
 SO101_JOINT_ORDER = SO101_ARM_JOINTS + [SO101_GRIPPER_JOINT]
 
 
+def _lookat_quat(eye, target, up=(0.0, 0.0, 1.0)):
+    """wxyz quaternion for a camera at `eye` looking at `target`, OpenGL
+    convention (camera -Z = forward, +Y = up)."""
+    eye = np.asarray(eye, dtype=np.float64)
+    target = np.asarray(target, dtype=np.float64)
+    up = np.asarray(up, dtype=np.float64)
+    fwd = target - eye
+    fwd /= np.linalg.norm(fwd)
+    z = -fwd  # OpenGL camera looks down -Z
+    x = np.cross(up, z)
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    R = np.column_stack([x, y, z])  # camera-to-world rotation
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w, qx, qy, qz = 0.25 * s, (R[2, 1] - R[1, 2]) / s, (R[0, 2] - R[2, 0]) / s, (R[1, 0] - R[0, 1]) / s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+        w, qx, qy, qz = (R[2, 1] - R[1, 2]) / s, 0.25 * s, (R[0, 1] + R[1, 0]) / s, (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+        w, qx, qy, qz = (R[0, 2] - R[2, 0]) / s, (R[0, 1] + R[1, 0]) / s, 0.25 * s, (R[1, 2] + R[2, 1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+        w, qx, qy, qz = (R[1, 0] - R[0, 1]) / s, (R[0, 2] + R[2, 0]) / s, (R[1, 2] + R[2, 1]) / s, 0.25 * s
+    return (float(w), float(qx), float(qy), float(qz))
+
+
 ### SceneCfg ###
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -119,8 +148,13 @@ class SceneCfg(InteractiveSceneCfg):
             ),
         )
         self.scene = scene
-        if not robot_splat:
-            self.robot.spawn.semantic_tags = [("class", "raytraced")]
+        # The SO-101 USD (converted from URDF) has no Gaussian-splat data, so it
+        # must be ray-traced and composited into the splat views. The splat env
+        # composites pixels whose semantic id >= 2 (get_robot_from_sim), so the
+        # robot needs the "raytraced" class tag or it is dropped from every
+        # camera. Tag it unconditionally (unlike the DROID robot, which ships
+        # its own robot splats).
+        self.robot.spawn.semantic_tags = [("class", "raytraced")]
 
         stage = Usd.Stage.Open(environment_path)
         scene_prim = stage.GetPrimAtPath("/World")
@@ -161,24 +195,31 @@ class SceneCfg(InteractiveSceneCfg):
                 )
                 setattr(self, name, asset)
 
-        if not hasattr(self, "external_cam"):
-            self.external_cam = CameraCfg(
-                prim_path="{ENV_REGEX_NS}/scene/external_cam",
-                height=720,
-                width=1280,
-                data_types=["rgb", "semantic_segmentation"],
-                colorize_semantic_segmentation=False,
-                spawn=sim_utils.PinholeCameraCfg(
-                    focal_length=1.0476,
-                    horizontal_aperture=2.5452,
-                    vertical_aperture=1.4721,
-                ),
-                offset=CameraCfg.OffsetCfg(
-                    pos=(-0.01, -0.33, 0.48),
-                    rot=(0.76, 0.43, -0.24, -0.42),
-                    convention="opengl",
-                ),
-            )
+        # Always override the third-person camera to frame the SO-101 at the
+        # origin. The reused scene's external_cam is aimed at the Franka's
+        # ~0.5 m workspace, beyond the SO-101's ~0.35 m reach, so the smaller
+        # arm falls outside that frame. Spawn a fresh camera looking at the
+        # arm's mid-workspace (keep the attribute name `external_cam` so the
+        # splat obs key is unchanged).
+        _eye = (0.5, -0.4, 0.4)
+        _target = (0.15, 0.0, 0.15)
+        self.external_cam = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/scene/external_cam_so101",
+            height=720,
+            width=1280,
+            data_types=["rgb", "semantic_segmentation"],
+            colorize_semantic_segmentation=False,
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=1.0476,
+                horizontal_aperture=2.5452,
+                vertical_aperture=1.4721,
+            ),
+            offset=CameraCfg.OffsetCfg(
+                pos=_eye,
+                rot=_lookat_quat(_eye, _target),
+                convention="opengl",
+            ),
+        )
 
 
 ### ActionCfg ###

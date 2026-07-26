@@ -175,3 +175,29 @@ gym.register(
         ),
     },
 )
+
+
+# =============================================================================
+# Generic embodiment path — same SO-101 + FoodBussing eval, but the env cfg is
+# BUILT FROM specs/so101.yaml via the generic builders (build_env_cfg), not the
+# hand-written so101_cfg. Proves the spec-driven path end-to-end.
+# =============================================================================
+from pathlib import Path as _Path
+from polaris.embodiment.spec import EmbodimentSpec as _EmbodimentSpec
+from polaris.embodiment.builders import build_env_cfg as _build_env_cfg
+from polaris.embodiment.tasks import pick_place_rubric as _pick_place_rubric
+
+_REPO_ROOT = _Path(__file__).resolve().parents[3]
+_so101_spec = _EmbodimentSpec.from_yaml(str(_REPO_ROOT / "specs" / "so101.yaml"))
+
+gym.register(
+    id="Embodiment-FoodBussing",
+    entry_point=ManagerBasedRLSplatEnv,
+    disable_env_checker=True,
+    order_enforce=False,
+    kwargs={
+        "env_cfg_entry_point": _build_env_cfg(_so101_spec),
+        "usd_file": str(DATA_PATH / "food_bussing/scene.usda"),
+        "rubric": _pick_place_rubric(_so101_spec, "grapes", "bowl"),
+    },
+)
